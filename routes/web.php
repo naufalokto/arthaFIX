@@ -22,6 +22,7 @@ Route::get('/login', function () {
 // Authentication routes
 Route::post('/signup', [ApiController::class, 'signup']);
 Route::post('/login', [ApiController::class, 'login']);
+Route::post('/logout', [ApiController::class, 'logout']);
 Route::post('/midtrans/webhook', [ApiController::class, 'midtransWebhook']);
 
 // Add this route for products
@@ -32,20 +33,38 @@ Route::get('/products', function () {
 // Admin routes
 Route::prefix('admin')->group(function () {
     Route::get('/dashboard', function () {
-        // Check if user is logged in and is admin
+        // Cek session untuk admin
         if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
             return redirect('/login');
         }
         return view('admin.dashboard');
     })->name('admin.dashboard');
     
-    Route::post('/create-account', [ApiController::class, 'createAccount']);
+    Route::post('/create-account', function() {
+        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        return app(ApiController::class)->createAccount(request());
+    })->name('admin.create-account');
+    
+    Route::get('/users', function() {
+        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        return app(ApiController::class)->getUsers();
+    })->name('admin.users.index');
+    
+    Route::delete('/users/{id}', function($id) {
+        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        return app(ApiController::class)->deleteUser($id);
+    })->name('admin.users.delete');
 });
 
 // Manager routes
 Route::prefix('manager')->group(function () {
     Route::get('/dashboard', function () {
-        // Check if user is logged in and is manager
         if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'manager') {
             return redirect('/login');
         }
@@ -59,7 +78,6 @@ Route::prefix('manager')->group(function () {
 // Sales routes
 Route::prefix('sales')->group(function () {
     Route::get('/dashboard', function () {
-        // Check if user is logged in and is sales
         if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'sales') {
             return redirect('/login');
         }
@@ -75,7 +93,6 @@ Route::prefix('sales')->group(function () {
 // Customer routes
 Route::prefix('customer')->group(function () {
     Route::get('/', function () {
-        // Check if user is logged in and is customer
         if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'customer') {
             return redirect('/login');
         }

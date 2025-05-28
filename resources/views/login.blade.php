@@ -77,6 +77,7 @@
         <h2>Login</h2>
         <div id="error-message" style="display: none;"></div>
         <form id="loginForm">
+            @csrf
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required>
@@ -85,11 +86,8 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit" class="btn-primary">Login</button>
+            <button type="submit" class="btn-primary" id="loginButton">Login</button>
         </form>
-        <div style="text-align:center;margin-top:18px;">
-            Belum punya akun? <a href="{{ route('signup') }}" style="color:#2563eb;font-weight:600;text-decoration:none;">Daftar</a>
-        </div>
     </div>
 
     <script>
@@ -104,16 +102,15 @@
         const errorMessage = document.getElementById('error-message');
         errorMessage.style.display = 'none';
         
-        console.log('Login attempt:', {
-            email: formData.email,
-            timestamp: new Date().toISOString()
-        });
+        const loginButton = document.getElementById('loginButton');
+        loginButton.disabled = true;
+        loginButton.textContent = 'Loading...';
         
         try {
             const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-            console.log('CSRF Token:', csrfToken);
             
-            console.log('Sending login request to:', window.location.origin + '/login');
+            console.log('Sending login request...', formData);
+            
             const response = await fetch('/login', {
                 method: 'POST',
                 headers: {
@@ -125,40 +122,22 @@
                 credentials: 'same-origin'
             });
             
-            console.log('Response received:', {
-                status: response.status,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers.entries())
-            });
-            
             const data = await response.json();
-            console.log('Response data:', data);
+            console.log('Login response:', data);
             
-            if (response.ok) {
-                console.log('Login successful, data:', data);
-                
-                if (data.redirect) {
-                    console.log('Redirecting to:', data.redirect);
-                    window.location.href = data.redirect;
-                } else {
-                    console.log('No redirect URL provided, going to homepage');
-                    window.location.href = '/';
-                }
+            if (response.ok && data.status === 'success') {
+                console.log('Login successful, redirecting to:', data.redirect);
+                window.location.replace(data.redirect);
+                return;
             } else {
-                console.error('Login failed:', {
-                    status: response.status,
-                    data: data
-                });
                 throw new Error(data.message || 'Login gagal');
             }
         } catch (error) {
-            console.error('Login error:', {
-                name: error.name,
-                message: error.message,
-                stack: error.stack
-            });
+            console.error('Login error:', error);
             errorMessage.style.display = 'block';
             errorMessage.textContent = error.message || 'Terjadi kesalahan saat login';
+            loginButton.disabled = false;
+            loginButton.textContent = 'Login';
         }
     });
     </script>

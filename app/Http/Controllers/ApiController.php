@@ -58,24 +58,19 @@ public function login(Request $request)
         // Log request data
         \Log::info('Login attempt received', [
             'email' => $request->email,
-            'request_data' => $request->all(),
-            'api_url' => $this->api . '/login'
+            'request_data' => $request->all()
         ]);
         
         // Validasi input
         if (!$request->email || !$request->password) {
-            \Log::warning('Login attempt failed: Missing credentials', [
-                'has_email' => (bool)$request->email,
-                'has_password' => (bool)$request->password
-            ]);
-            
+            \Log::warning('Login attempt failed: Missing credentials');
             return response()->json([
                 'status' => 'error',
                 'message' => 'Email dan password harus diisi'
             ], 422);
         }
         
-        // Buat HTTP client dengan konfigurasi yang benar
+        // Buat HTTP client
         $client = new \GuzzleHttp\Client([
             'base_uri' => $this->api,
             'timeout' => 30,
@@ -87,11 +82,10 @@ public function login(Request $request)
         ]);
 
         \Log::info('Sending request to backend', [
-            'url' => $this->api . '/login',
-            'email' => $request->email
+            'url' => $this->api . '/login'
         ]);
 
-        // Kirim request menggunakan Guzzle
+        // Kirim request ke backend Go
         $response = $client->post('/login', [
             'json' => [
                 'email' => $request->email,
@@ -99,32 +93,16 @@ public function login(Request $request)
             ]
         ]);
         
-        // Get response body
         $body = $response->getBody()->getContents();
-        
-        // Log raw response
-        \Log::info('Backend response received', [
-            'status' => $response->getStatusCode(),
-            'body' => $body
-        ]);
-
-        // Parse JSON response
         $data = json_decode($body, true);
         
-        \Log::info('Parsed response data', [
+        \Log::info('Login response received', [
             'status_code' => $response->getStatusCode(),
-            'has_token' => isset($data['token']),
-            'has_role' => isset($data['role']),
-            'role' => $data['role'] ?? 'unknown'
+            'response_data' => $data
         ]);
 
         if ($response->getStatusCode() === 200 && isset($data['token'])) {
-            \Log::info('Login successful', [
-                'email' => $data['email'] ?? $request->email,
-                'role' => $data['role'] ?? 'unknown'
-            ]);
-
-            // Simpan data user dan token ke session
+            // Simpan data user ke session
             session([
                 'user' => [
                     'email' => $data['email'],
@@ -134,26 +112,21 @@ public function login(Request $request)
                 'jwt_token' => $data['token']
             ]);
 
-            \Log::info('Session data saved', [
-                'session' => [
-                    'has_user' => session()->has('user'),
-                    'has_token' => session()->has('jwt_token'),
-                    'user_role' => session('user')['role'] ?? 'missing'
-                ]
+            \Log::info('Login successful', [
+                'user_role' => $data['role'],
+                'session_data' => session()->all()
             ]);
 
-            // Tentukan redirect URL berdasarkan role
-            $role = strtolower($data['role'] ?? '');
-            $redirectUrl = match($role) {
+            // Tentukan redirect berdasarkan role
+            $redirectUrl = match(strtolower($data['role'])) {
                 'admin' => '/admin/dashboard',
                 'manager' => '/manager/dashboard',
                 'sales' => '/sales/dashboard',
-                'customer' => '/customer',
                 default => '/'
             };
 
             \Log::info('Redirecting user', [
-                'role' => $role,
+                'role' => $data['role'],
                 'redirect_url' => $redirectUrl
             ]);
 
@@ -169,39 +142,27 @@ public function login(Request $request)
             ], 200);
         }
 
-        // Handle error response
-        $errorMessage = $data['message'] ?? 'Login gagal. Silakan cek email dan password Anda.';
-        
-        \Log::error('Login failed', [
-            'status_code' => $response->getStatusCode(),
-            'error_response' => $body
-        ]);
-
         return response()->json([
             'status' => 'error',
-            'message' => $errorMessage
-        ], $response->getStatusCode());
+            'message' => $data['message'] ?? 'Login gagal'
+        ], 401);
 
     } catch (\GuzzleHttp\Exception\ConnectException $e) {
         \Log::error('Backend connection error', [
-            'message' => $e->getMessage(),
-            'api_url' => $this->api . '/login'
+            'message' => $e->getMessage()
         ]);
-        
         return response()->json([
             'status' => 'error',
-            'message' => 'Tidak dapat terhubung ke server. Pastikan backend server berjalan.'
+            'message' => 'Tidak dapat terhubung ke server'
         ], 503);
     } catch (\Exception $e) {
-        \Log::error('Unexpected login error', [
+        \Log::error('Login error', [
             'message' => $e->getMessage(),
-            'class' => get_class($e),
             'trace' => $e->getTraceAsString()
         ]);
-        
         return response()->json([
             'status' => 'error',
-            'message' => 'Terjadi kesalahan pada server. Silakan coba lagi.'
+            'message' => 'Terjadi kesalahan pada server'
         ], 500);
     }
 }
@@ -213,7 +174,211 @@ public function login(Request $request)
     // ADMIN
     public function createAccount(Request $request)
     {
-        // Implementasi create account admin
+        try {
+            // Log request data (tanpa password)
+            $requestData = $request->all();
+            $logData = array_merge($requestData, ['password' => '***']);
+            
+            \Log::info('Create account attempt received', [
+                'request_data' => $logData,
+                'api_url' => $this->api . '/admin/create-account',
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => request()->header('Content-Type')
+                ]
+            ]);
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'name' => 'required|string|max:255',
+                'email' => 'required|string|email|max:255',
+                'password' => 'required|string|min:6',
+                'role' => 'required|in:Manager,Sales'
+            ]);
+
+            if ($validator->fails()) {
+                \Log::warning('Create account validation failed', [
+                    'errors' => $validator->errors()
+                ]);
+                
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal: ' . implode(', ', $validator->errors()->all())
+                ], 422);
+            }
+
+            // Split name into firstname and lastname
+            $nameParts = explode(' ', $request->name, 2);
+            $firstname = $nameParts[0];
+            $lastname = isset($nameParts[1]) ? $nameParts[1] : '';
+
+            // Generate username from email
+            $username = explode('@', $request->email)[0];
+
+            // Format data sesuai ekspektasi backend Go
+            $userData = [
+                'firstname' => $firstname,
+                'lastname' => $lastname,
+                'email' => $request->email,
+                'username' => $username,
+                'password' => $request->password,
+                'role' => ucfirst($request->role)
+            ];
+
+            // Log data yang akan dikirim (tanpa password)
+            \Log::info('Data yang akan dikirim ke backend:', array_merge(
+                $userData,
+                ['password' => '***']
+            ));
+
+            // Ambil token dari header
+            $authHeader = request()->header('Authorization');
+            if (!$authHeader) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Authorization header tidak ditemukan'
+                ], 401);
+            }
+
+            // Buat HTTP client dengan konfigurasi yang benar
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            \Log::info('Sending create account request to backend', [
+                'url' => $this->api . '/admin/create-account',
+                'method' => 'POST',
+                'data' => array_merge($userData, ['password' => '***']),
+                'headers_sent' => [
+                    'Authorization' => $authHeader,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ]
+            ]);
+
+            // Kirim request menggunakan Guzzle
+            $response = $client->post('/admin/create-account', [
+                'headers' => [
+                    'Authorization' => $authHeader,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json'
+                ],
+                'json' => $userData
+            ]);
+            
+            // Get response body
+            $body = $response->getBody()->getContents();
+            
+            // Log raw response
+            \Log::info('Backend response received', [
+                'status' => $response->getStatusCode(),
+                'body' => $body,
+                'headers' => $response->getHeaders()
+            ]);
+
+            // Parse JSON response
+            $data = json_decode($body, true);
+
+            if ($response->getStatusCode() === 201 || $response->getStatusCode() === 200) {
+                \Log::info('Account creation successful', [
+                    'email' => $request->email,
+                    'role' => $request->role
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Akun berhasil dibuat',
+                    'user' => $data['user'] ?? null
+                ], 201);
+            }
+
+            // Jika sampai sini berarti ada error dari backend
+            throw new \Exception($data['message'] ?? 'Gagal membuat akun');
+
+        } catch (\GuzzleHttp\Exception\ServerException $e) {
+            $response = $e->getResponse();
+            $body = $response->getBody()->getContents();
+            
+            \Log::error('Backend server error', [
+                'status' => $response->getStatusCode(),
+                'body' => $body,
+                'request' => [
+                    'method' => $e->getRequest()->getMethod(),
+                    'url' => (string) $e->getRequest()->getUri(),
+                    'headers' => $e->getRequest()->getHeaders(),
+                    'body' => json_decode($e->getRequest()->getBody()->getContents(), true)
+                ]
+            ]);
+            
+            $errorMessage = $body;
+            try {
+                $jsonError = json_decode($body, true);
+                if ($jsonError && isset($jsonError['message'])) {
+                    $errorMessage = $jsonError['message'];
+                }
+            } catch (\Exception $jsonEx) {
+                // Jika gagal parse JSON, gunakan pesan error mentah
+            }
+            
+            // Cek jika error karena duplicate username
+            if (strpos($body, 'user_username_key') !== false) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Username sudah digunakan. Silakan gunakan email lain.'
+                ], 400);
+            }
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuat akun: ' . $errorMessage
+            ], 500);
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $response = $e->getResponse();
+            $body = json_decode($response->getBody()->getContents(), true);
+            
+            \Log::error('Backend client error', [
+                'status' => $response->getStatusCode(),
+                'body' => $body,
+                'request' => [
+                    'method' => $e->getRequest()->getMethod(),
+                    'url' => (string) $e->getRequest()->getUri(),
+                    'headers' => $e->getRequest()->getHeaders(),
+                    'body' => json_decode($e->getRequest()->getBody()->getContents(), true)
+                ]
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => $body['message'] ?? 'Gagal membuat akun'
+            ], $response->getStatusCode());
+            
+        } catch (\GuzzleHttp\Exception\ConnectException $e) {
+            \Log::error('Backend connection error', [
+                'message' => $e->getMessage(),
+                'request' => [
+                    'url' => $this->api . '/admin/create-account'
+                ]
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Tidak dapat terhubung ke server. Pastikan backend berjalan.'
+            ], 503);
+            
+        } catch (\Exception $e) {
+            \Log::error('Create account error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal membuat akun: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // SALES
@@ -272,5 +437,128 @@ public function login(Request $request)
     public function deleteCartItems(Request $request)
     {
         // Implementasi hapus item cart
+    }
+
+    public function getUsers()
+    {
+        try {
+            // Log request
+            \Log::info('Getting users list');
+            
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                    'Authorization' => request()->header('Authorization') // Ambil dari request header
+                ]
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->get('/admin/users');
+
+            $body = $response->getBody()->getContents();
+            
+            // Log response
+            \Log::info('Users list received', [
+                'status' => $response->getStatusCode(),
+                'body' => $body
+            ]);
+
+            // Parse dan return data
+            $data = json_decode($body, true);
+            
+            if ($response->getStatusCode() === 200) {
+                return response()->json(
+                    $data['users'] ?? $data,
+                    200
+                );
+            }
+
+            throw new \Exception($data['message'] ?? 'Gagal mengambil daftar user');
+
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            $response = $e->getResponse();
+            $body = json_decode($response->getBody()->getContents(), true);
+            
+            \Log::error('Backend client error when getting users', [
+                'status' => $response->getStatusCode(),
+                'body' => $body,
+                'headers' => $e->getRequest()->getHeaders()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => $body['message'] ?? 'Gagal mengambil daftar user'
+            ], $response->getStatusCode());
+
+        } catch (\Exception $e) {
+            \Log::error('Error getting users list', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengambil daftar user: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteUser($id)
+    {
+        try {
+            // Log request
+            \Log::info('Deleting user', ['user_id' => $id]);
+            
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false,
+                'headers' => [
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json'
+                ]
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->delete("/users/{$id}");
+            
+            // Log response
+            \Log::info('User deleted successfully', [
+                'user_id' => $id,
+                'status' => $response->getStatusCode()
+            ]);
+
+            return response()->json([
+                'message' => 'User berhasil dihapus'
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to delete user', [
+                'user_id' => $id,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'message' => 'Gagal menghapus user'
+            ], 500);
+        }
+    }
+
+    public function logout()
+    {
+        // Hapus semua data session
+        session()->flush();
+        
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Berhasil logout'
+        ]);
     }
 }
