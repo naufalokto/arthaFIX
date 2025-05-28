@@ -91,21 +91,16 @@ Route::prefix('sales')->group(function () {
 });
 
 // Customer routes
-Route::prefix('customer')->group(function () {
-    Route::get('/', function () {
-        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'customer') {
-            return redirect('/login');
-        }
-        return view('customer.dashboard');
-    })->name('customer.dashboard');
-    
+Route::get('/customer/dashboard', function () {
+    \Log::info('Session user', session('user'));
+    if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'customer') {
+        return redirect('/login');
+    }
+    return view('customer.dashboard');
+
     Route::get('/transactions', [ApiController::class, 'viewTransaction']);
     Route::post('/checkout', [ApiController::class, 'checkout']);
     Route::post('/cart', [ApiController::class, 'addToCart']);
     Route::get('/cart', [ApiController::class, 'getUserCart']);
     Route::delete('/cart', [ApiController::class, 'deleteCartItems']);
-});
-
-Route::fallback(function () {
-    return redirect()->route('home');
 });
