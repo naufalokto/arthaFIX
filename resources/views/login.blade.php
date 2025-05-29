@@ -6,6 +6,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Login</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body {
             background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
@@ -77,7 +79,6 @@
         <h2>Login</h2>
         <div id="error-message" style="display: none;"></div>
         <form id="loginForm">
-            @csrf
             <div class="form-group">
                 <label for="email">Email</label>
                 <input type="email" id="email" name="email" required>
@@ -91,55 +92,52 @@
     </div>
 
     <script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const formData = {
-            email: document.getElementById('email').value,
-            password: document.getElementById('password').value
-        };
-            
-        const errorMessage = document.getElementById('error-message');
-        errorMessage.style.display = 'none';
-        
-        const loginButton = document.getElementById('loginButton');
-        loginButton.disabled = true;
-        loginButton.textContent = 'Loading...';
-        
-        try {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-            
-            console.log('Sending login request...', formData);
-            
-            const response = await fetch('/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify(formData),
-                credentials: 'same-origin'
-            });
-            
-            const data = await response.json();
-            console.log('Login response:', data);
-            
-            if (response.ok && data.status === 'success') {
-                console.log('Login successful, redirecting to:', data.redirect);
-                window.location.replace(data.redirect);
-                return;
-            } else {
-                throw new Error(data.message || 'Login gagal');
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
             }
-        } catch (error) {
-            console.error('Login error:', error);
-            errorMessage.style.display = 'block';
-            errorMessage.textContent = error.message || 'Terjadi kesalahan saat login';
-            loginButton.disabled = false;
-            loginButton.textContent = 'Login';
-        }
-    });
+        });
+
+        $('#loginForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            const email = $('#email').val();
+            const password = $('#password').val();
+            
+            // Disable button and show loading state
+            const loginButton = $('#loginButton');
+            loginButton.prop('disabled', true);
+            loginButton.text('Loading...');
+            
+            // Hide any previous error message
+            $('#error-message').hide();
+
+            $.ajax({
+                url: '/login',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    email: email,
+                    password: password
+                }),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Redirect ke halaman sesuai role
+                        window.location.href = response.redirect;
+                    } else {
+                        $('#error-message').text(response.message).show();
+                        loginButton.prop('disabled', false);
+                        loginButton.text('Login');
+                    }
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || 'An error occurred during login';
+                    $('#error-message').text(message).show();
+                    loginButton.prop('disabled', false);
+                    loginButton.text('Login');
+                }
+            });
+        });
     </script>
 </body>
 </html>

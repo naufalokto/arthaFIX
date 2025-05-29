@@ -130,9 +130,34 @@
                 padding-right: 16px;
             }
         }
+        .alert-success {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.95);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            animation: fadeOut 5s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
     </style>
 </head>
 <body>
+
+@if(session('message'))
+<div class="alert-success">
+    {{ session('message') }}
+</div>
+@endif
 
 <header>
     <div><strong>Solusi-Digital Artha Makmur Jaya</strong></div>

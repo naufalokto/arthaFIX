@@ -384,22 +384,239 @@ public function login(Request $request)
     // SALES
     public function insertProductAndStock(Request $request)
     {
-        // Implementasi insert produk dan stok
+        try {
+            \Log::info('Insert product and stock attempt received', [
+                'request_data' => $request->all()
+            ]);
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'product.product_name' => 'required|string',
+                'product.price' => 'required|numeric|min:0',
+                'product.note' => 'nullable|string',
+                'stock.stock' => 'required|integer|min:1'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal: ' . implode(', ', $validator->errors()->all())
+                ], 422);
+            }
+
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->post('/sales/stocks', [
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => 'application/json'
+                ],
+                'json' => $request->all()
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            return response()->json($data, $response->getStatusCode());
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to insert product and stock', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menambahkan produk dan stok: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function updateProductStock(Request $request)
     {
-        // Implementasi update stok produk
+        try {
+            \Log::info('Update product stock attempt received', [
+                'request_data' => $request->all()
+            ]);
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'product_id' => 'required|integer',
+                'stock' => 'required|integer|min:0'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal: ' . implode(', ', $validator->errors()->all())
+                ], 422);
+            }
+
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->put('/sales/stocks', [
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => 'application/json'
+                ],
+                'json' => $request->all()
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Stok berhasil diperbarui'
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to update product stock', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal memperbarui stok: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function insertRawMaterial(Request $request)
     {
-        // Implementasi insert raw material
+        try {
+            \Log::info('Insert raw material attempt received', [
+                'request_data' => $request->all()
+            ]);
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'raw_material_name' => 'required|string',
+                'price' => 'required|numeric|min:0',
+                'supplier' => 'required|string'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validasi gagal: ' . implode(', ', $validator->errors()->all())
+                ], 422);
+            }
+
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->post('/sales/rawmaterial', [
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => 'application/json'
+                ],
+                'json' => $request->all()
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            return response()->json($data, $response->getStatusCode());
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to insert raw material', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal menambahkan bahan baku: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function getRawMaterialsSorted(Request $request)
     {
-        // Implementasi get raw materials sorted
+        try {
+            \Log::info('Get sorted raw materials attempt received');
+
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->get('/sales/rawmaterial', [
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => 'application/json'
+                ]
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            return response()->json($data, $response->getStatusCode());
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to get raw materials', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengambil data bahan baku: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getStock(Request $request)
+    {
+        try {
+            \Log::info('Get stock attempt received');
+
+            // Buat HTTP client
+            $client = new \GuzzleHttp\Client([
+                'base_uri' => $this->api,
+                'timeout' => 30,
+                'verify' => false
+            ]);
+
+            // Kirim request ke backend
+            $response = $client->get('/sales/stocks', [
+                'headers' => [
+                    'Authorization' => request()->header('Authorization'),
+                    'Content-Type' => 'application/json'
+                ]
+            ]);
+
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            return response()->json($data, $response->getStatusCode());
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to get stock', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Gagal mengambil data stok: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     // MANAGER
@@ -556,9 +773,6 @@ public function login(Request $request)
         // Hapus semua data session
         session()->flush();
         
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Berhasil logout'
-        ]);
+        return redirect('/')->with('message', 'Berhasil logout');
     }
 }

@@ -22,7 +22,7 @@ Route::get('/login', function () {
 // Authentication routes
 Route::post('/signup', [ApiController::class, 'signup']);
 Route::post('/login', [ApiController::class, 'login']);
-Route::post('/logout', [ApiController::class, 'logout']);
+Route::post('/logout', [ApiController::class, 'logout'])->name('logout');
 Route::post('/midtrans/webhook', [ApiController::class, 'midtransWebhook']);
 
 // Add this route for products
@@ -84,10 +84,12 @@ Route::prefix('sales')->group(function () {
         return view('sales.dashboard');
     })->name('sales.dashboard');
     
-    Route::post('/stocks', [ApiController::class, 'insertProductAndStock']);
-    Route::put('/stocks', [ApiController::class, 'updateProductStock']);
-    Route::post('/rawmaterial', [ApiController::class, 'insertRawMaterial']);
-    Route::get('/rawmaterial', [ApiController::class, 'getRawMaterialsSorted']);
+    Route::post('/products/store', [ApiController::class, 'insertProductAndStock'])->name('sales.products.store');
+    Route::put('/products/stock/update', [ApiController::class, 'updateProductStock'])->name('sales.products.stock.update');
+    Route::get('/products/stock', [ApiController::class, 'getStock'])->name('sales.products.stock');
+    
+    Route::post('/raw-materials/store', [ApiController::class, 'insertRawMaterial'])->name('sales.raw-materials.store');
+    Route::get('/raw-materials', [ApiController::class, 'getRawMaterialsSorted'])->name('sales.raw-materials.index');
 });
 
 // Customer routes
