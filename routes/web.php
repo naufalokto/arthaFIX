@@ -4,6 +4,8 @@ use App\Http\Controllers\ApiController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\DebugController;
 use App\Http\Controllers\ManagerController;
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\CustomerController;
 
 // Public routes
 Route::get('/', function () {
@@ -71,52 +73,38 @@ Route::prefix(['auth.check'])->group(function () {
     // });
     
 // Admin routes
-Route::middleware(['admin'])->prefix('admin')->group(function () {
+Route::prefix('admin')->group(function () {
     // Dashboard
-    Route::get('/dashboard', function () {
-        return view('admin.dashboard');
-    })->name('admin.dashboard');
-
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    
     // User Management
-    Route::get('/users', function () {
-        return view('admin.users');
-    })->name('admin.users');
-    Route::get('/viewuser', [App\Http\Controllers\ApiController::class, 'getUsers']);
-    Route::post('/create-account', [App\Http\Controllers\ApiController::class, 'createAccount']);
-    Route::delete('/delete-user', [App\Http\Controllers\ApiController::class, 'deleteUser']);
+    Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
+    Route::get('/viewuser', [AdminController::class, 'getUsers']);
+    Route::post('/create-account', [AdminController::class, 'createAccount']);
+    Route::delete('/delete-user', [AdminController::class, 'deleteUser']);
 
     // Product Management
-    Route::get('/products', function () {
-        return view('admin.products');
-    })->name('admin.products');
-    Route::post('/products', [App\Http\Controllers\ApiController::class, 'insertProductAndStock']);
-    Route::put('/products/{id}/stock', [App\Http\Controllers\ApiController::class, 'updateProductStock']);
-    Route::delete('/products', [App\Http\Controllers\ApiController::class, 'deleteStock']);
+    Route::get('/products', [AdminController::class, 'products'])->name('admin.products');
+    Route::post('/products', [AdminController::class, 'insertProductAndStock']);
+    Route::put('/products/{id}/stock', [AdminController::class, 'updateProductStock']);
+    Route::delete('/products', [AdminController::class, 'deleteStock']);
 
     // Raw Materials
-    Route::get('/raw-materials', function () {
-        return view('admin.raw-materials');
-    })->name('admin.raw-materials');
-    Route::post('/raw-materials', [App\Http\Controllers\ApiController::class, 'insertRawMaterial']);
-    Route::delete('/raw-materials/{id}', [App\Http\Controllers\ApiController::class, 'deleteRawMaterial']);
+    Route::get('/raw-materials', [AdminController::class, 'rawMaterials'])->name('admin.raw-materials');
+    Route::post('/raw-materials', [AdminController::class, 'insertRawMaterial']);
+    Route::delete('/raw-materials/{id}', [AdminController::class, 'deleteRawMaterial']);
 
     // Transactions
-    Route::get('/transactions', function () {
-        return view('admin.transactions');
-    })->name('admin.transactions');
-    Route::get('/transaction-view', [App\Http\Controllers\ApiController::class, 'viewTransactionSummary']);
+    Route::get('/transactions', [AdminController::class, 'transactions'])->name('admin.transactions');
+    Route::get('/transaction-view', [AdminController::class, 'viewTransactionSummary']);
 
     // Reports
-    Route::get('/reports', function () {
-        return view('admin.reports');
-    })->name('admin.reports');
+    Route::get('/reports', [AdminController::class, 'reports'])->name('admin.reports');
 });
 
     // Sales routes
     Route::middleware(['sales'])->prefix('sales')->group(function () {
-        Route::get('/dashboard', function () {
-            return view('sales.dashboard');
-        })->name('sales.dashboard');
+        Route::get('/dashboard', [SalesController::class, 'dashboard'])->name('sales.dashboard');
         Route::get('/stocks', [ApiController::class, 'getStock']);
         Route::get('/products', [ApiController::class, 'getProducts']);
     });
@@ -124,9 +112,7 @@ Route::middleware(['admin'])->prefix('admin')->group(function () {
 
 // Customer routes
 Route::middleware(['auth'])->prefix('customer')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('customer.dashboard');
-    })->name('customer.dashboard');
+    Route::get('/dashboard', [CustomerController::class, 'dashboard'])->name('customer.dashboard');
 
     Route::get('/products', [ApiController::class, 'getProducts'])->name('customer.products');
     Route::get('/transactions/summary', [ApiController::class, 'viewTransactionSummary'])->name('customer.transactions.summary');
@@ -148,8 +134,6 @@ Route::get('/test-midtrans', function () {
 Route::post('/midtrans/webhook', [ApiController::class, 'midtransWebhook']);
 
 // Manager Routes
-Route::middleware(['manager'])->prefix('manager')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('manager.dashboard');
-    })->name('manager.dashboard');
+Route::prefix('manager')->group(function () {
+    Route::get('/dashboard', [ManagerController::class, 'dashboard'])->name('manager.dashboard');
 });
