@@ -72,37 +72,51 @@ Route::prefix(['auth.check'])->group(function () {
     
 // Admin routes
 Route::middleware(['admin'])->prefix('admin')->group(function () {
+    // Dashboard
     Route::get('/dashboard', function () {
         return view('admin.dashboard');
     })->name('admin.dashboard');
-    
-    Route::post('/create-account', function() {
-        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        return app(ApiController::class)->createAccount(request());
-    })->name('admin.create-account');
-    
-    Route::get('/users', function() {
-        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        return app(ApiController::class)->getUsers();
-    })->name('admin.users.index');
-    
-    Route::delete('/users/{id}', function($id) {
-        if (!session('jwt_token') || !session('user') || strtolower(session('user')['role']) !== 'admin') {
-            return response()->json(['message' => 'Unauthorized'], 401);
-        }
-        return app(ApiController::class)->deleteUser($id);
-    })->name('admin.users.delete');
+
+    // User Management
+    Route::get('/users', function () {
+        return view('admin.users');
+    })->name('admin.users');
+    Route::get('/viewuser', [App\Http\Controllers\ApiController::class, 'getUsers']);
+    Route::post('/create-account', [App\Http\Controllers\ApiController::class, 'createAccount']);
+    Route::delete('/delete-user', [App\Http\Controllers\ApiController::class, 'deleteUser']);
+
+    // Product Management
+    Route::get('/products', function () {
+        return view('admin.products');
+    })->name('admin.products');
+    Route::post('/products', [App\Http\Controllers\ApiController::class, 'insertProductAndStock']);
+    Route::put('/products/{id}/stock', [App\Http\Controllers\ApiController::class, 'updateProductStock']);
+    Route::delete('/products', [App\Http\Controllers\ApiController::class, 'deleteStock']);
+
+    // Raw Materials
+    Route::get('/raw-materials', function () {
+        return view('admin.raw-materials');
+    })->name('admin.raw-materials');
+    Route::post('/raw-materials', [App\Http\Controllers\ApiController::class, 'insertRawMaterial']);
+    Route::delete('/raw-materials/{id}', [App\Http\Controllers\ApiController::class, 'deleteRawMaterial']);
+
+    // Transactions
+    Route::get('/transactions', function () {
+        return view('admin.transactions');
+    })->name('admin.transactions');
+    Route::get('/transaction-view', [App\Http\Controllers\ApiController::class, 'viewTransactionSummary']);
+
+    // Reports
+    Route::get('/reports', function () {
+        return view('admin.reports');
+    })->name('admin.reports');
 });
 
     // Sales routes
     Route::middleware(['sales'])->prefix('sales')->group(function () {
         Route::get('/dashboard', function () {
             return view('sales.dashboard');
-        });
+        })->name('sales.dashboard');
         Route::get('/stocks', [ApiController::class, 'getStock']);
         Route::get('/products', [ApiController::class, 'getProducts']);
     });
