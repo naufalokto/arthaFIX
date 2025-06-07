@@ -12,8 +12,8 @@ class UserController extends Controller
     public function index()
     {
         try {
-            // Ambil semua user kecuali yang memiliki role Admin
-            $users = User::where('role', '!=', 'Admin')->get();
+            // Ambil semua user kecuali yang memiliki role admin
+            $users = User::where('role', '!=', 'admin')->get();
             return response()->json($users, 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Gagal mengambil data users'], 500);
@@ -27,7 +27,7 @@ class UserController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => 'required|string|email|max:255|unique:users',
                 'password' => 'required|string|min:6',
-                'role' => 'required|in:Manager,Sales'
+                'role' => 'required|in:manager,sales'
             ]);
 
             if ($validator->fails()) {
@@ -38,7 +38,7 @@ class UserController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role' => ucfirst(strtolower($request->role)) // Memastikan format role sesuai (Manager/Sales)
+                'role' => strtolower($request->role) // Memastikan format role lowercase
             ]);
 
             return response()->json([
@@ -56,9 +56,9 @@ class UserController extends Controller
         try {
             $user = User::findOrFail($id);
             
-            // Mencegah penghapusan akun Admin
-            if ($user->role === 'Admin') {
-                return response()->json(['message' => 'Tidak dapat menghapus akun Admin'], 403);
+            // Mencegah penghapusan akun admin
+            if ($user->role === 'admin') {
+                return response()->json(['message' => 'Tidak dapat menghapus akun admin'], 403);
             }
 
             $user->delete();

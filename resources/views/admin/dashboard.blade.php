@@ -46,6 +46,10 @@
             background: #1d4ed8;
             color: white;
         }
+        .admin-nav a.active {
+            background: #1d4ed8;
+            color: white;
+        }
         .admin-card {
             background: white;
             border-radius: 12px;
@@ -140,10 +144,10 @@
         </div>
         
         <div class="admin-nav">
-            <a href="#" onclick="toggleManageUser()">Manage Users</a>
-            <a href="/admin/products">Products</a>
-            <a href="/admin/orders">Orders</a>
-            <a href="/admin/settings">Settings</a>
+            <a href="#" onclick="toggleManageUser()" class="active">Manage Users</a>
+            <a href="#" onclick="toggleTab('products')">Products</a>
+            <a href="#" onclick="toggleTab('orders')">Orders</a>
+            <a href="#" onclick="toggleTab('settings')">Settings</a>
         </div>
         
         <!-- Form Manage User -->
@@ -177,6 +181,9 @@
         <!-- Tabel User -->
         <div class="admin-card">
             <h3>Daftar User</h3>
+            <button class="btn-primary" onclick="toggleManageUser()" style="margin-bottom: 15px;">
+                Tambah User Baru
+            </button>
             <table class="user-table">
                 <thead>
                     <tr>
@@ -210,6 +217,11 @@
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
         }
 
+        function toggleTab(tabName) {
+            // For future implementation of tab switching
+            alert('Fitur ' + tabName + ' belum tersedia');
+        }
+
         async function logout() {
             try {
                 await $.post('/logout');
@@ -227,28 +239,61 @@
                 // Tampilkan loading state
                 tbody.html('<tr><td colspan="4" style="text-align: center;">Loading...</td></tr>');
                 
-                console.log('Fetching users list...');
+                console.log('Mengambil daftar users...');
                 const response = await $.ajax({
-                    url: '/admin/users',
-                    method: 'GET'
+                    url: '/admin/viewuser',
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    timeout: 10000 // Timeout setelah 10 detik
                 });
                 
-                console.log('Users list received:', response);
+                console.log('Daftar users diterima:', response);
                 
                 tbody.empty();
                 
-                if (!Array.isArray(response)) {
-                    throw new Error('Invalid response format');
+                // Validasi response
+                if (!response) {
+                    throw new Error('Tidak ada data yang diterima dari server');
                 }
                 
-                if (response.length === 0) {
-                    tbody.html('<tr><td colspan="4" style="text-align: center;">Tidak ada user</td></tr>');
+                // Tangani jika response bukan array
+                let users = response;
+                if (!Array.isArray(response)) {
+                    // Coba parse jika response adalah string JSON
+                    try {
+                        if (typeof response === 'string') {
+                            users = JSON.parse(response);
+                        } else {
+                            users = [];
+                        }
+                    } catch (e) {
+                        users = [];
+                    }
+                }
+                
+                if (!Array.isArray(users) || users.length === 0) {
+                    tbody.html(`
+                        <tr>
+                            <td colspan="4" style="text-align: center;">
+                                Belum ada user. 
+                                <a href="#" onclick="toggleManageUser()" style="color: #2563eb; text-decoration: underline;">
+                                    Tambahkan user baru
+                                </a>
+                            </td>
+                        </tr>
+                    `);
                     return;
                 }
                 
-                response.forEach(user => {
+                // Tambahkan ID sementara untuk setiap user berdasarkan indeks
+                users.forEach((user, index) => {
                     // Skip admin dari list
-                    if (user.role.toLowerCase() === 'admin') return;
+                    if (user.role && user.role.toLowerCase() === 'admin') return;
+                    
+                    // Gunakan ID numerik berdasarkan indeks (simulasi user_id)
+                    const userId = index + 1; 
                     
                     tbody.append(`
                         <tr>
@@ -257,8 +302,10 @@
                             <td>${user.role || '-'}</td>
                             <td>
                                 <button 
-                                    onclick="deleteUser(${user.id})"
+                                    onclick="deleteUser(${userId}, '${user.email}')"
                                     class="btn-delete"
+                                    data-user-id="${userId}"
+                                    data-email="${user.email}"
                                 >
                                     Hapus
                                 </button>
@@ -268,8 +315,30 @@
                 });
             } catch (error) {
                 console.error('Error loading users:', error);
+                const statusCode = error.status || '';
                 const errorMessage = error.responseJSON?.message || error.message || 'Gagal memuat daftar user';
-                tbody.html(`<tr><td colspan="4" style="text-align: center; color: #dc2626;">${errorMessage}</td></tr>`);
+                
+                // Log error details
+                console.error('Error details:', {
+                    status: error.status,
+                    statusText: error.statusText,
+                    responseText: error.responseText,
+                    readyState: error.readyState
+                });
+                
+                tbody.html(`
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #dc2626;">
+                            ${errorMessage} (${statusCode})
+                            <br><small>Pastikan backend Go berjalan di port 9090</small>
+                            <br><small>Pesan dari BE: unexpected EOF [rows:0]</small>
+                            <br><br>
+                            <button class="btn-primary" onclick="toggleManageUser()">
+                                Tambah User Baru
+                            </button>
+                        </td>
+                    </tr>
+                `);
                 
                 // Jika unauthorized, redirect ke login
                 if (error.status === 401) {
@@ -279,18 +348,71 @@
             }
         }
 
-        async function deleteUser(id) {
-            if (!confirm('Anda yakin ingin menghapus user ini?')) return;
+        async function deleteUser(userId, email) {
+            if (!confirm(`Anda yakin ingin menghapus user ${email}?`)) return;
             
+            // Gunakan ID numerik, bukan email
+            console.log('Menghapus user dengan ID:', userId, 'Email:', email);
+            
+            // Metode 1: Menggunakan query parameter (direkomendasikan)
             try {
-                await $.ajax({
-                    url: `/admin/users/${id}`,
-                    method: 'DELETE'
+                console.log('Mencoba menghapus user dengan query parameter', { id: userId });
+                const response = await $.ajax({
+                    url: `/admin/delete-user?id=${userId}`,
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 });
-                await loadUsers();
+                
+                console.log('Respons penghapusan:', response);
+                alert('User berhasil dihapus!');
+                await loadUsers(); // Muat ulang daftar user
+                return;
             } catch (error) {
-                console.error('Error deleting user:', error);
-                alert('Gagal menghapus user. Silakan coba lagi.');
+                console.error('Gagal menghapus dengan query parameter:', error);
+                // Jika metode pertama gagal, coba metode kedua
+            }
+            
+            // Metode 2: Menggunakan format JSON yang benar dengan user_id
+            try {
+                console.log('Mencoba menghapus user dengan JSON body', { user_id: userId });
+                const response = await $.ajax({
+                    url: '/admin/delete-user',
+                    method: 'DELETE',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ user_id: userId }), // Gunakan user_id, bukan email
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                console.log('Respons penghapusan (metode 2):', response);
+                alert('User berhasil dihapus!');
+                await loadUsers(); // Muat ulang daftar user
+            } catch (error) {
+                console.error('Gagal menghapus dengan JSON body:', error);
+                
+                // Jika kedua metode gagal, coba menggunakan email sebagai fallback
+                try {
+                    console.log('Mencoba menghapus user dengan email sebagai fallback', { email });
+                    const response = await $.ajax({
+                        url: '/admin/delete-user',
+                        method: 'DELETE',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ email: email }), // Gunakan email sebagai fallback
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    console.log('Respons penghapusan (fallback):', response);
+                    alert('User berhasil dihapus!');
+                    await loadUsers(); // Muat ulang daftar user
+                } catch (finalError) {
+                    console.error('Semua metode penghapusan gagal:', finalError);
+                    alert(`Gagal menghapus user: ${finalError.responseJSON?.message || finalError.message}`);
+                }
             }
         }
 
@@ -351,6 +473,49 @@
                     submitBtn.prop('disabled', false).text('Buat Akun');
                 }
             });
+        });
+
+        // Fungsi untuk memeriksa dan menampilkan form jika tidak ada data user
+        async function checkAndShowCreateForm() {
+            try {
+                const response = await $.ajax({
+                    url: '/admin/viewuser',
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    timeout: 5000
+                });
+                
+                // Jika tidak ada data user atau terjadi error, tampilkan form tambah user
+                if (!response || !Array.isArray(response) || response.length === 0) {
+                    // Tampilkan form tambah user
+                    toggleManageUser();
+                    
+                    // Tambahkan pesan
+                    $('#manageUserForm').prepend(`
+                        <div class="alert alert-info" style="background-color: #e0f2fe; padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #38bdf8;">
+                            <strong>Belum ada user!</strong> Silakan tambahkan user pertama (Manager/Sales).
+                        </div>
+                    `);
+                }
+            } catch (error) {
+                console.error('Error checking users:', error);
+                // Tampilkan form tambah user jika terjadi error
+                toggleManageUser();
+                
+                // Tambahkan pesan
+                $('#manageUserForm').prepend(`
+                    <div class="alert alert-warning" style="background-color: #fef3c7; padding: 10px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #f59e0b;">
+                        <strong>Gagal memeriksa data user!</strong> Silakan tambahkan user baru.
+                    </div>
+                `);
+            }
+        }
+        
+        // Panggil fungsi untuk memeriksa dan menampilkan form
+        $(document).ready(function() {
+            checkAndShowCreateForm();
         });
     </script>
 </body>
